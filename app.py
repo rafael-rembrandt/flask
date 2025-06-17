@@ -216,10 +216,10 @@ HTML_TEMPLATE = '''
                         <!-- Arquivo -->
                         <div>
                             <label class="block text-sm font-medium mb-1">Arquivo DOCX</label>
-                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                            <div class="border-2 border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50">
                                 <input type="file" id="arquivo" accept=".docx" class="hidden">
                                 <i class="fas fa-file-word text-3xl text-gray-400 mb-2"></i>
-                                <p class="text-gray-600 text-sm">Clique ou arraste o arquivo aqui</p>
+                                <p class="text-gray-600 text-sm">Clique para selecionar o arquivo</p>
                                 <p id="fileName" class="text-sm text-blue-600 mt-2"></p>
                             </div>
                         </div>
@@ -257,6 +257,18 @@ HTML_TEMPLATE = '''
                     <button onclick="buscarSentencas()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">
                         <i class="fas fa-search mr-2"></i>Buscar
                     </button>
+                </div>
+                
+                <!-- Busca no conteúdo dos documentos -->
+                <div class="mt-4 pt-4 border-t">
+                    <label class="block text-sm font-medium mb-2">Buscar no conteúdo dos documentos</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="buscaConteudo" placeholder="Buscar texto dentro dos documentos DOCX..." 
+                               class="flex-1 border rounded-lg px-4 py-2">
+                        <button onclick="buscarNoConteudo()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-file-search mr-2"></i>Buscar no Conteúdo
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -305,7 +317,7 @@ HTML_TEMPLATE = '''
         let tiposResultado = [];
         let selectedMateriaIndex = -1;
         
-        // Configurar área de upload
+        // Configurar área de upload (sem drag and drop)
         const fileInput = document.getElementById('arquivo');
         const dropZone = fileInput.parentElement;
         
@@ -511,46 +523,7 @@ HTML_TEMPLATE = '''
                 if (sentencas.length === 0) {
                     document.getElementById('emptyState').classList.remove('hidden');
                 } else {
-                    sentencas.forEach(sentenca => {
-                        const corrigidoIcon = sentenca.foi_corrigido 
-                            ? '<i class="fas fa-check-circle text-green-600" title="Corrigido"></i>'
-                            : '<i class="fas fa-times-circle text-red-600" title="Não corrigido"></i>';
-                        
-                        const sentencaHtml = `
-                            <div class="border rounded-lg p-4 hover:shadow-md transition">
-                                <div class="flex justify-between items-start">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-3 mb-2">
-                                            <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                                                ${sentenca.categoria}
-                                            </span>
-                                            <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                                                ${sentenca.resultado}
-                                            </span>
-                                            ${corrigidoIcon}
-                                            <span class="text-gray-600 text-sm">${sentenca.numero_processo}</span>
-                                            <span class="text-gray-500 text-sm">${sentenca.data_sentenca}</span>
-                                        </div>
-                                        <h3 class="font-semibold mb-1">${sentenca.materia}</h3>
-                                        ${sentenca.observacoes ? `<p class="text-gray-600 text-sm">${sentenca.observacoes}</p>` : ''}
-                                    </div>
-                                    <div class="flex gap-2 ml-4">
-                                        <button onclick="visualizarSentenca(${sentenca.id})" 
-                                                class="text-blue-600 hover:text-blue-800">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        ${sentenca.arquivo_nome ? `
-                                            <button onclick="baixarDocumento(${sentenca.id})" 
-                                                    class="text-green-600 hover:text-green-800">
-                                                <i class="fas fa-download"></i>
-                                            </button>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        document.getElementById('sentencasList').innerHTML += sentencaHtml;
-                    });
+                    mostrarSentencas(sentencas);
                 }
                 
                 document.getElementById('totalSentencas').textContent = sentencas.length;
@@ -558,6 +531,81 @@ HTML_TEMPLATE = '''
                 document.getElementById('loading').classList.add('hidden');
                 alert('Erro ao buscar sentenças');
             }
+        }
+        
+        // Buscar no conteúdo dos documentos
+        async function buscarNoConteudo() {
+            const texto = document.getElementById('buscaConteudo').value;
+            if (!texto.trim()) {
+                alert('Digite algo para buscar no conteúdo');
+                return;
+            }
+            
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('sentencasList').innerHTML = '';
+            document.getElementById('emptyState').classList.add('hidden');
+            
+            try {
+                const response = await fetch(`/api/sentencas/buscar-conteudo?q=${encodeURIComponent(texto)}`);
+                const sentencas = await response.json();
+                
+                document.getElementById('loading').classList.add('hidden');
+                
+                if (sentencas.length === 0) {
+                    document.getElementById('emptyState').classList.remove('hidden');
+                } else {
+                    mostrarSentencas(sentencas);
+                }
+                
+                document.getElementById('totalSentencas').textContent = sentencas.length;
+            } catch (error) {
+                document.getElementById('loading').classList.add('hidden');
+                alert('Erro ao buscar no conteúdo');
+            }
+        }
+        
+        // Função para mostrar sentenças (reutilizada)
+        function mostrarSentencas(sentencas) {
+            sentencas.forEach(sentenca => {
+                const corrigidoIcon = sentenca.foi_corrigido 
+                    ? '<i class="fas fa-check-circle text-green-600" title="Corrigido"></i>'
+                    : '<i class="fas fa-times-circle text-red-600" title="Não corrigido"></i>';
+                
+                const sentencaHtml = `
+                    <div class="border rounded-lg p-4 hover:shadow-md transition">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                                        ${sentenca.categoria}
+                                    </span>
+                                    <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                                        ${sentenca.resultado}
+                                    </span>
+                                    ${corrigidoIcon}
+                                    <span class="text-gray-600 text-sm">${sentenca.numero_processo}</span>
+                                    <span class="text-gray-500 text-sm">${sentenca.data_sentenca}</span>
+                                </div>
+                                <h3 class="font-semibold mb-1">${sentenca.materia}</h3>
+                                ${sentenca.observacoes ? `<p class="text-gray-600 text-sm">${sentenca.observacoes}</p>` : ''}
+                            </div>
+                            <div class="flex gap-2 ml-4">
+                                <button onclick="visualizarSentenca(${sentenca.id})" 
+                                        class="text-blue-600 hover:text-blue-800">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                ${sentenca.arquivo_nome ? `
+                                    <button onclick="baixarDocumento(${sentenca.id})" 
+                                            class="text-green-600 hover:text-green-800">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('sentencasList').innerHTML += sentencaHtml;
+            });
         }
         
         // Visualizar sentença
@@ -722,7 +770,7 @@ def buscar_materias():
     if len(query) < 2:
         return jsonify([])
     
-    # Buscar matérias que contenham o texto
+    # Buscar matérias que contenham o texto (case-insensitive)
     materias = Materia.query.filter(
         Materia.nome.ilike(f'%{query}%')
     ).limit(10).all()
@@ -731,13 +779,16 @@ def buscar_materias():
     palavras = query.split()
     if len(palavras) > 1:
         # Buscar com palavras em qualquer ordem
+        materias_encontradas = set([m.id for m in materias])
         for palavra in palavras:
-            materias_extra = Materia.query.filter(
-                Materia.nome.ilike(f'%{palavra}%')
-            ).limit(5).all()
-            for mat in materias_extra:
-                if mat not in materias:
-                    materias.append(mat)
+            if len(palavra) > 2:  # Ignorar palavras muito curtas
+                materias_extra = Materia.query.filter(
+                    Materia.nome.ilike(f'%{palavra}%')
+                ).limit(5).all()
+                for mat in materias_extra:
+                    if mat.id not in materias_encontradas:
+                        materias.append(mat)
+                        materias_encontradas.add(mat.id)
     
     return jsonify([mat.to_dict() for mat in materias[:10]])
 
@@ -759,10 +810,11 @@ def listar_sentencas():
         sentencas_query = Sentenca.query.join(Materia).join(Categoria)
         
         if query_text:
+            # Busca case-insensitive usando ilike
             search_filter = or_(
-                Sentenca.numero_processo.contains(query_text),
-                Materia.nome.contains(query_text),
-                Sentenca.observacoes.contains(query_text)
+                Sentenca.numero_processo.ilike(f'%{query_text}%'),
+                Materia.nome.ilike(f'%{query_text}%'),
+                Sentenca.observacoes.ilike(f'%{query_text}%')
             )
             sentencas_query = sentencas_query.filter(search_filter)
         
@@ -774,6 +826,23 @@ def listar_sentencas():
         
         # Ordenar por data decrescente
         sentencas = sentencas_query.order_by(Sentenca.data_sentenca.desc()).all()
+        
+        return jsonify([sent.to_dict() for sent in sentencas])
+    except Exception as e:
+        return jsonify([])
+
+@app.route('/api/sentencas/buscar-conteudo')
+def buscar_no_conteudo():
+    try:
+        query_text = request.args.get('q', '')
+        if not query_text:
+            return jsonify([])
+        
+        # Buscar sentenças onde o conteúdo do documento contém o texto
+        # Case-insensitive usando ilike
+        sentencas = Sentenca.query.filter(
+            Sentenca.conteudo.ilike(f'%{query_text}%')
+        ).order_by(Sentenca.data_sentenca.desc()).all()
         
         return jsonify([sent.to_dict() for sent in sentencas])
     except Exception as e:
